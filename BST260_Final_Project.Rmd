@@ -1,0 +1,147 @@
+---
+title: "BST260_Final_Project"
+author: "Qingru Xu"
+date: "2021/11/30"
+output: html_document
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(dplyr)
+library("gridExtra")
+```
+
+###EDA
+
+```{r}
+data <- read_csv("music_genre.csv")
+```
+
+```{r}
+#Look at data
+head(data)
+summary(data)
+dim(data)
+```
+
+```{r}
+#Check and remove NAs
+data[!complete.cases(data),]
+data_clean <- na.omit(data)
+dim(data_clean)
+```
+
+```{r}
+#Check and remove duplicates
+data_clean[duplicated(data_clean),]#all NAs, so remove
+```
+
+```{r}
+#Turn variables into right types
+data_clean <- data_clean %>% mutate(
+                        key = as.factor(key),
+                        mode = as.factor(mode),
+                        obtained_date = as.factor(obtained_date),
+                        music_genre = as.factor(music_genre),
+                        tempo = as.numeric(tempo)
+                        )
+```
+```{r}
+#check and remove NAs introduced by tempo error
+data_clean[!complete.cases(data_clean),]
+data_clean <- na.omit(data_clean)
+dim(data_clean)
+```
+
+```{r}
+#treat date varible
+unique(data_clean$obtained_date)
+#meaningless for prediction, so remove the column
+
+data_clean <- data_clean %>% select(-c("obtained_date"))
+```
+
+
+```{r}
+#Look at data
+summary(data_clean)
+```
+
+```{r}
+#visualize artist_name top 10
+Artist <- as.data.frame(table(data_clean$artist_name)) %>%
+  arrange(desc(Freq))
+head(Artist)#first row empty filed should be removed
+
+Artist <- Artist[-1,]
+head(Artist)
+
+top10_Artist <- Artist[c(1:10),]
+top10_Artist$Var1 <- factor(top10_Artist$Var1, levels = rev(top10_Artist$Var1))
+top10_Artist %>%
+  ggplot()+
+  geom_histogram(aes(x = Var1, y = Freq),stat = "identity")+
+  coord_flip()+
+  ylab("Number of songs per artist")+
+  xlab("Artist name")+
+  ggtitle("Top 10 Artists with the most number of songs")
+```
+
+```{r}
+#instance_id and track_name (unique) are useless for prediction and artist_name too compliated, remove
+data_clean <- data_clean %>% select(-c("instance_id","artist_name","track_name"))
+```
+
+```{r}
+#categorical variables visualization
+#keys
+p1 <- data_clean %>%
+  ggplot()+
+  geom_bar(aes(x=key), stat = "count")+
+  ggtitle("Keys distribution")
+
+#Modes
+p2 <- data_clean %>%
+  ggplot()+
+  geom_bar(aes(x=mode), stat = "count")+
+  ggtitle("Modes distribution")+
+  ylab("")
+
+#Music Genre
+p3 <- data_clean %>%
+  ggplot()+
+  geom_bar(aes(x=music_genre), stat = "count")+
+  xlab("Music Genre")+
+  ggtitle("Music genres distribution")+
+  ylab("")
+
+grid.arrange(p1,p2,p3,nrow = 1)
+```
+```{r}
+#Numerical variables visualization
+
+```
+
+```{r}
+#Musical characteristics (variables) potential relationships
+
+```
+
+### Machine Learning 
+
+```{r}
+#population as outcome (Regression),variable slection, visualization
+
+```
+
+```{r}
+#music genre as outcome (Multiclass Classification), variable slection, visualization
+
+```
+
+```{r}
+#Mode as outcome (binary Classfication), variable slection, visualization
+```
+
