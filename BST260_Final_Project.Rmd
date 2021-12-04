@@ -252,7 +252,310 @@ data_clean %>%
 
 ```
 
+#### Mode as outcome (binary Classfication), variable slection, visualization
+
 ```{r}
-#Mode as outcome (binary Classfication), variable slection, visualization
+library(splitstackshape)
+library(caret)
+library(e1071)
+library(MASS)
+library(pROC)
+library(rpart)
+library(randomForest)
+library(knitr)
+```
+
+##### Exploratory analysis (EDA)
+
+```{r}
+# Frequency of mode
+count(data_clean, mode)
+```
+
+```{r}
+# Contingency table for mode and music genre
+tab1 <- xtabs(~ mode + music_genre, data = data_clean)
+tab1
+```
+
+```{r}
+# Box plots for continuous predictors
+par(mfrow=c(2,3))
+boxplot(popularity ~ mode, data = data_clean)
+boxplot(acousticness ~ mode, data = data_clean)
+boxplot(danceability ~ mode, data = data_clean)
+boxplot(duration_ms ~ mode, data = data_clean)
+boxplot(energy ~ mode, data = data_clean)
+boxplot(instrumentalness ~ mode, data = data_clean)
+boxplot(liveness ~ mode, data = data_clean)
+boxplot(loudness ~ mode, data = data_clean)
+boxplot(speechiness ~ mode, data = data_clean)
+boxplot(tempo ~ mode, data = data_clean)
+boxplot(valence ~ mode, data = data_clean)
+```
+
+```{r}
+# Histogram for continuous predictors
+h1 <- data_clean %>% 
+  ggplot(aes(popularity, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h2 <- data_clean %>% 
+  ggplot(aes(acousticness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h3 <- data_clean %>% 
+  ggplot(aes(danceability, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h4 <- data_clean %>% 
+  ggplot(aes(duration_ms, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h5 <- data_clean %>% 
+  ggplot(aes(energy, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h6 <- data_clean %>% 
+  ggplot(aes(instrumentalness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h7 <- data_clean %>% 
+  ggplot(aes(liveness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h8 <- data_clean %>% 
+  ggplot(aes(loudness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h9 <- data_clean %>% 
+  ggplot(aes(instrumentalness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h10 <- data_clean %>% 
+  ggplot(aes(liveness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+h11 <- data_clean %>% 
+  ggplot(aes(loudness, ..density..)) +
+  geom_histogram(bins=10, color="black") +
+  facet_grid(mode~.)
+
+grid.arrange(h1,h2,h3,h4,h5,h6,h7,h8,h9,h10,h11, ncol = 4)
+```
+
+```{r}
+# Stacked bar charts for categorical predictors
+p1 <- data_clean %>% ggplot(aes(x=key,fill=factor(mode))) +
+  geom_bar(position = "fill") +
+  stat_count(geom = "text", 
+             aes(label = paste(round((..count..)/sum(..count..)*100), "%")),
+             position=position_fill(vjust=0.5), colour="white")
+p2 <- data_clean %>% ggplot(aes(x=music_genre,fill=factor(mode))) +
+  geom_bar(position = "fill") +
+  stat_count(geom = "text", 
+             aes(label = paste(round((..count..)/sum(..count..)*100), "%")),
+             position=position_fill(vjust=0.5), colour="white")
+grid.arrange(p1,p2,ncol=1)
+```
+
+According to EDA, four continuous variables (acousticness, danceability, instrumentalness,  speechiness) and two categorical variables (key and music genre) visually display different distributions at two types of modes. So the six variables will be selected as the predictors for the following binary classification. 
+
+##### Prepare the data for binary classification
+
+```{r}
+# Set level for mode (Minor=1, Major=0)
+levels(data_clean$mode) <- c(0,1)
+```
+
+A 70% training, 30% test set split is used. Since there is an imbalance in the outcome groups (25959/40560 = 64% songs with major modes and 14601/40560 = 36% with minor modes), we take this into account during data spliting and use stratified function to split data the same percent of songs from each class (major/minor). 
+
+```{r}
+# Create training and test sets
+set.seed(1)
+
+x <- stratified(data_clean, "mode", 0.7, keep.rownames = TRUE)
+train_set <- x %>% dplyr::select(-rn)
+train_index <- as.numeric(x$rn)
+test_set <- data_clean[-train_index,]
+
+dim(train_set)
+dim(test_set)
+```
+
+##### Logistic regression
+
+```{r}
+# Fit a logistic regression model
+glm_fit <- glm(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data= train_set, family = "binomial")
+# Prediction for the test set 
+p_hat_logit <- predict(glm_fit, newdata = test_set, type="response")
+# Convert the probabilities to predicted response labels 
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 1, 0)
+cm_logit <- confusionMatrix(data = as.factor(y_hat_logit), reference = as.factor(test_set$mode))
+cm_logit
+```
+
+##### Naive Bayes
+
+```{r}
+# Fit a Naive Bayes model 
+nb_fit <- naiveBayes(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data=train_set)
+# Prediction for the test set 
+p_hat_nb <- predict(nb_fit, test_set, type = "raw")[,2]
+# Convert the probabilities to predicted response labels 
+y_hat_nb <- predict(nb_fit, test_set)
+# Confusion matrix
+cm_nb <- confusionMatrix(data = as.factor(y_hat_nb), reference = as.factor(test_set$mode))
+cm_nb
+```
+
+##### kNN
+
+```{r}
+# Fit a k-nearest neighbors model
+knn_fit <- knn3(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data=train_set, k=7)
+# Prediction for the test set 
+f_hat <- predict(knn_fit, newdata = test_set)[,2]
+# Confusion matrix
+f_tab <- table(pred=round(f_hat), truth=test_set$mode)
+cm_knn <- confusionMatrix(f_tab)
+cm_knn
+```
+
+##### LDA
+
+```{r}
+# Fit an LDA model 
+set.seed(1)
+lda_fit <- lda(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data=train_set)
+# Prediction for the test set 
+p_hat_lda <- predict(lda_fit, newdata = test_set)$posterior[,2]
+# Convert the probabilities to predicted response labels 
+y_hat_lda <- ifelse(p_hat_lda > 0.5, 1, 0)
+# Confusion matrix
+cm_lda <- confusionMatrix(data = as.factor(y_hat_lda), reference = as.factor(test_set$mode))
+cm_lda
+```
+
+##### QDA
+
+```{r}
+# Fit a QDA model
+set.seed(1)
+qda_fit <- qda(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data=train_set)
+# Prediction for the test set 
+p_hat_qda <- predict(qda_fit, newdata = test_set)$posterior[,2]
+# Convert the probabilities to predicted response labels 
+y_hat_qda <- ifelse(p_hat_qda > 0.5, 1, 0)
+# Confusion matrix
+cm_qda <- confusionMatrix(data = as.factor(y_hat_qda), reference = as.factor(test_set$mode))
+cm_qda
+```
+
+##### Decision trees
+
+```{r}
+# Fit a decision tree model 
+set.seed(1)
+rpart_fit <- rpart(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data=train_set)
+# Prediction for the test set 
+p_hat_rpart <- predict(rpart_fit, newdata = test_set)[,2]
+# Convert the probabilities to predicted response labels 
+y_hat_rpart <- ifelse(p_hat_rpart > 0.5, 1, 0)
+# Confusion matrix
+cm_rpart <- confusionMatrix(data = as.factor(y_hat_rpart), reference = as.factor(test_set$mode))
+cm_rpart
+```
+
+##### Random forest
+
+```{r}
+# Fit a random forest model 
+set.seed(1)
+rf_fit <- randomForest(mode ~ acousticness + danceability + instrumentalness + speechiness + key + music_genre, data=train_set)
+# Prediction for the test set 
+p_hat_rf <- predict(rf_fit, newdata = test_set, type = "prob")[,2]
+# Convert the probabilities to predicted response labels 
+y_hat_rf <- ifelse(p_hat_rf > 0.5, 1, 0)
+# Confusion matrix
+cm_rf <- confusionMatrix(data = as.factor(y_hat_rf), reference = as.factor(test_set$mode))
+cm_rf
+```
+
+```{r}
+# Variable importance table
+variable_importance <- importance(rf_fit) 
+tmp <- tibble(feature = rownames(variable_importance),
+                  Gini = variable_importance[,1]) %>%
+                  arrange(desc(Gini))
+kable(tmp)
+```
+
+```{r}
+# Bar plot of variable importance 
+tmp %>% filter(Gini > 200) %>%
+        ggplot(aes(x=reorder(feature, Gini), y=Gini)) +
+        geom_bar(stat='identity') +
+        coord_flip() + xlab("Feature") +
+        theme(axis.text=element_text(size=8))
+```
+
+##### Model comparison
+
+###### Overall accuracy, specificity, and sensitivity
+
+```{r}
+cm_logit$byClass[1:2]
+```
+
+```{r}
+tab2 <- matrix(c(cm_logit$overall[1],cm_logit$byClass[1:2],
+                 cm_nb$overall[1],cm_nb$byClass[1:2],
+                 cm_knn$overall[1],cm_knn$byClass[1:2],
+                 cm_lda$overall[1],cm_lda$byClass[1:2],
+                 cm_qda$overall[1],cm_qda$byClass[1:2],
+                 cm_rpart$overall[1],cm_rpart$byClass[1:2],
+                 cm_rf$overall[1],cm_rf$byClass[1:2]), ncol=3, byrow = TRUE)
+colnames(tab2) <- c("Accuracy","Sensitivity","Specificity")
+rownames(tab2) <- c("Logistic Regression", "Naive Bayes", "kNN", "LDA", "QDA", "Decision Tree", "Random Forest")
+tab2
+```
+
+###### ROC curves
+
+```{r}
+## Logistic regression
+roc_glm <- roc(as.factor(test_set$mode),p_hat_logit)
+## Naive Bayes
+roc_nb <- roc(as.factor(test_set$mode), p_hat_nb)
+## kNN
+roc_knn <- roc(as.factor(test_set$mode), f_hat)
+## LDA
+roc_lda <- roc(as.factor(test_set$mode),p_hat_lda)
+## QDA
+roc_qda <- roc(as.factor(test_set$mode), p_hat_qda)
+## Decision tree
+roc_rpart <- roc(as.factor(test_set$mode), p_hat_rpart)
+## Random forest
+roc_rf <- roc(as.factor(test_set$mode), p_hat_rf)
+# Graph with 7 ROC curves for each model
+ggroc(list("Logistic regression" = roc_glm, "Naive Bayes" = roc_nb, "kNN" = roc_knn, "LDA" = roc_lda, "QDA" = roc_qda, "Decision tree" = roc_rpart, "Random forest" = roc_rf)) +
+  theme(legend.title = element_blank()) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color = "black", linetype = "dashed") +
+  xlab("Sensitivity") +
+  ylab("Specificity") 
+```
+
+###### AUC values
+
+```{r}
+auc(roc_glm)
+auc(roc_nb)
+auc(roc_knn)
+auc(roc_lda)
+auc(roc_qda)
+auc(roc_rpart)
+auc(roc_rf)
 ```
 
