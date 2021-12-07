@@ -1,258 +1,15 @@
 ---
 title: "BST260_Final_Project"
-author: "Qingru Xu"
+author: "Wenyu Jin"
 date: "2021/11/30"
 output: html_document
 ---
-
-```{r}
-library(readr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(dplyr)
-library(gridExtra)
-library(GGally)
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
-## Exploratory Data Analysis
-
-```{r}
-data <- read_csv("music_genre.csv")
-```
-
-```{r}
-#Look at data
-head(data)
-summary(data)
-dim(data)
-```
-
-```{r}
-#Check and remove NAs
-data[!complete.cases(data),]
-data_clean <- na.omit(data)
-dim(data_clean)
-```
-
-```{r}
-#Check and remove duplicates
-data_clean[duplicated(data_clean),]#all NAs, so remove
-```
-
-```{r}
-#Turn variables into right types
-data_clean <- data_clean %>% mutate(
-                        key = as.factor(key),
-                        mode = as.factor(mode),
-                        obtained_date = as.factor(obtained_date),
-                        music_genre = as.factor(music_genre),
-                        tempo = as.numeric(tempo)
-                        )
-```
-```{r}
-#check and remove NAs introduced by tempo error
-data_clean[!complete.cases(data_clean),]
-data_clean <- na.omit(data_clean)
-dim(data_clean)
-```
-
-```{r}
-#treat date variable
-unique(data_clean$obtained_date)
-
-#meaningless for prediction, so remove the column
-data_clean <- data_clean %>% select(-c("obtained_date"))
-
-#remove rows with duration_ms variable with -1
-data_clean <- data_clean[-which(data_clean$duration_ms == -1),]
-```
-
-
-```{r}
-#Look at data
-summary(data_clean)
-dim(data_clean)
-```
-
-```{r}
-#visualize artist_name top 10
-Artist <- as.data.frame(table(data_clean$artist_name)) %>%
-  arrange(desc(Freq))
-head(Artist)#first row empty filed should be removed
-
-Artist <- Artist[-1,]
-head(Artist)
-
-top10_Artist <- Artist[c(1:10),]
-top10_Artist$Var1 <- factor(top10_Artist$Var1, levels = rev(top10_Artist$Var1))
-top10_Artist %>%
-  ggplot()+
-  geom_histogram(aes(x = Var1, y = Freq),stat = "identity")+
-  coord_flip()+
-  ylab("Number of songs per artist")+
-  xlab("Artist name")+
-  ggtitle("Top 10 Artists with the most number of songs")+
-  theme_bw()
-```
-
-
-```{r}
-#instance_id and track_name (unique) are useless for prediction and artist_name too compliated, remove
-data_clean <- data_clean %>% select(-c("instance_id","artist_name","track_name"))
-```
-
-```{r}
-#Categorical Variable visualization
-data_clean %>%
-  gather(predictor, value, c(key, mode, music_genre)) %>%
-  ggplot()+
-  geom_bar(aes(x=value), stat = "count")+
-  facet_wrap(~ predictor, 
-             scales = "free",
-             labeller = 
-             as_labeller(c("key"="Key", 
-                "mode" = "Mode", 
-                "music_genre" = "Music Genre")))+
-  xlab(NULL)+ylab(NULL)+theme_bw()+
-  theme(axis.text.x = element_text(angle = 45,hjust=1))+
-  ggtitle("Categorical Variables Distribution")
-```
-
-```{r}
-#Continuous variables visualization
-'%!in%' <- function(x,y)!('%in%'(x,y))
-names <- colnames(data_clean)[colnames(data_clean)%!in% c("key", "mode", "music_genre")]
-
-data_clean %>%
-  gather(predictor, value, names) %>%
-  ggplot()+
-  geom_histogram(aes(x=value))+
-  facet_wrap(~ predictor, 
-             scales = "free",labeller = 
-             as_labeller(c("popularity"="Popularity", 
-                "acousticness" = "Acousticness", 
-                "danceability" = "Danceability",
-                "duration_ms" = "Duration (ms)",
-                "energy" = "Energy",
-                "instrumentalness" = "Instrumentalness",
-                "liveness" = "Liveness",
-                "loudness" = "Loudness",
-                "speechiness" = "Speechiness",
-                "tempo" = "Tempo",
-                "valence" = "Valence")))+
-  xlab(NULL)+ylab(NULL)+theme_bw()+
-  ggtitle("Continuous Variables Distribution")
-```
-
-```{r}
-#Categorical Variable Distribution with Popularity
-data_clean %>%
-  gather(predictor, value, c(key, mode, music_genre)) %>%
-  ggplot()+
-  geom_boxplot(aes(x=value, y = popularity))+
-  facet_wrap(~ predictor, 
-             scales = "free",
-             labeller = 
-             as_labeller(c("key"="Key", 
-                "mode" = "Mode", 
-                "music_genre" = "Music Genre")))+
-  xlab(NULL)+ylab("Popularity")+theme_bw()+
-  theme(axis.text.x = element_text(angle = 45,hjust=1))+
-  ggtitle("Categorical Variables Distribution with Popularity")
-```
-
-```{r}
-#Continuous Variables Distribution with Popularity
-data_clean %>%
-  gather(predictor, value, names[-1]) %>%
-  ggplot()+
-  geom_point(aes(x=value, y = popularity), size = 0.001)+
-  facet_wrap(~ predictor, 
-             scales = "free",
-             labeller =
-             as_labeller(c(
-                "acousticness" = "Acousticness", 
-                "danceability" = "Danceability",
-                "duration_ms" = "Duration (ms)",
-                "energy" = "Energy",
-                "instrumentalness" = "Instrumentalness",
-                "liveness" = "Liveness",
-                "loudness" = "Loudness",
-                "speechiness" = "Speechiness",
-                "tempo" = "Tempo",
-                "valence" = "Valence")))+
-  xlab(NULL)+ylab("Popularity")+theme_bw()+
-  ggtitle("Continuous Variables Distribution with Popularity")
-```
-
-```{r}
-#Continuous Variables Distribution with Mode
-data_clean %>%
-  gather(predictor, value, names) %>%
-  ggplot()+
-  geom_boxplot(aes(x=mode, y = value))+
-  facet_wrap(~ predictor, 
-             scales = "free_y",
-             labeller =
-             as_labeller(c("popularity"="Popularity", 
-                "acousticness" = "Acousticness", 
-                "danceability" = "Danceability",
-                "duration_ms" = "Duration (ms)",
-                "energy" = "Energy",
-                "instrumentalness" = "Instrumentalness",
-                "liveness" = "Liveness",
-                "loudness" = "Loudness",
-                "speechiness" = "Speechiness",
-                "tempo" = "Tempo",
-                "valence" = "Valence")))+
-  xlab("Mode")+ylab(NULL)+theme_bw()+
-  ggtitle("Continuous Variables Distribution with Mode")
-```
-
-```{r}
-#Continuous Variable Distribution with Music Genre
-data_clean %>%
-  gather(predictor, value, names) %>%
-  ggplot()+
-  geom_boxplot(aes(x=music_genre, y = value))+
-  facet_wrap(~ predictor, 
-             scales = "free_y",
-             labeller =
-             as_labeller(c("popularity"="Popularity", 
-                "acousticness" = "Acousticness", 
-                "danceability" = "Danceability",
-                "duration_ms" = "Duration (ms)",
-                "energy" = "Energy",
-                "instrumentalness" = "Instrumentalness",
-                "liveness" = "Liveness",
-                "loudness" = "Loudness",
-                "speechiness" = "Speechiness",
-                "tempo" = "Tempo",
-                "valence" = "Valence")))+
-  xlab("Music Genre")+ylab(NULL)+theme_bw()+
-  theme(axis.text.x = element_text(angle = 60,hjust=1))+
-  ggtitle("Continuous Variable Distribution with Music Genre")
-
-```
-
-## Machine Learning 
-
-```{r}
-#population as outcome (Regression),variable slection, visualization
-
-```
-
-```{r}
-#population as outcome (Classification),variable slection, visualization
-```
-
-```{r}
-#music genre as outcome (Multiclass Classification), variable slection, visualization
-
-```
-
-#### Mode as outcome (binary Classfication), variable slection, visualization
+### Machine Learning I (Binary Classification)
+#### Mode (binary variable) as outcome
 
 ```{r}
 library(splitstackshape)
@@ -263,13 +20,20 @@ library(pROC)
 library(rpart)
 library(randomForest)
 library(knitr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+```
+
+```{r}
+data_clean <- readRDS("music_genre_clean.rds")
 ```
 
 ##### Exploratory analysis (EDA)
 
 ```{r}
 # Frequency of mode
-count(data_clean, mode)
+table(data_clean$mode)
 ```
 
 ```{r}
@@ -558,4 +322,6 @@ auc(roc_qda)
 auc(roc_rpart)
 auc(roc_rf)
 ```
+
+
 

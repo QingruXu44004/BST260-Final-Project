@@ -1,0 +1,134 @@
+---
+title: "BST260_Final_Project"
+author: "Qingru Xu"
+date: "12/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+### Machine Learning II (Multiclass Classification)
+#### Music Genre (10 levels categorical variable) as outcome
+
+```{r}
+library(tidyverse)
+library(caret)
+library(tree)
+library(MASS)
+library(randomForest)
+library(pROC)
+library(splitstackshape)
+library(knitr)
+library(dplyr)
+```
+
+```{r}
+data_clean <- readRDS("music_genre_clean.rds")
+```
+
+##### Prepare the data for multiclass classification
+
+This data set is too large for running 10 classes classification on my local PC. So I sample 500 for each Music Genre. 
+```{r}
+set.seed(1)
+sample_data_clean <- stratified(data_clean, "music_genre", 500)
+dim(sample_data_clean)
+```
+
+```{r}
+# Create training and test sets
+set.seed(1)
+index_train = createDataPartition(y = sample_data_clean$music_genre, 
+                                  times = 1, p = 0.7, list = FALSE)
+train_set = slice(sample_data_clean, index_train)
+test_set = slice(sample_data_clean, -index_train)
+
+dim(train_set)
+dim(test_set)
+```
+
+#### Model training (Random Forest)
+
+```{r}
+#rf
+set.seed(1)
+
+fit_rf = randomForest(music_genre ~ ., data = train_set)
+preds_rf = predict(fit_rf, newdata = test_set, importance = TRUE)
+confusionMatrix(preds_rf, test_set$music_genre)
+```
+
+#### Treat outcome variable (Music Genre)
+
+From the confusion matrix, we see that it seems that most difficulty is to distinguish between `Hip-Hop` and `Rap`. So we would combine these two music genre into `Hip-Hop/Rap`. `Alternative`, `Blues`, `Jazz` seem to be difficult to classified. So we simply remove those music genres.  Also, the results show that `Classical` and `Rock` received the better performance.
+
+```{r}
+set.seed(1)
+#Combine Hip-Hop and Rap
+sample_data_clean[which(sample_data_clean$music_genre %in% c('Hip-Hop','Rap'))]$music_genre <- "Hip-Hop/Rap"
+
+#Remove Alternative, Blues, and Jazz
+sample_data_clean <- sample_data_clean %>% filter(music_genre!='Alternative')
+sample_data_clean <- sample_data_clean %>% filter(music_genre!='Blues')
+sample_data_clean <- sample_data_clean %>% filter(music_genre!='Jazz')
+sample_data_clean$music_genre <- droplevels(sample_data_clean$music_genre)
+
+#sample again
+sample_data_clean <- stratified(sample_data_clean, "music_genre", 500)
+dim(sample_data_clean)
+
+# Create training and test sets again
+index_train = createDataPartition(y = sample_data_clean$music_genre, 
+                                  times = 1, p = 0.7, list = FALSE)
+train_set = slice(sample_data_clean, index_train)
+test_set = slice(sample_data_clean, -index_train)
+
+dim(train_set)
+dim(test_set)
+```
+
+#### Improved Model Training
+
+```{r}
+set.seed(1)
+#train rf again
+
+fit_rf = randomForest(music_genre ~ ., data = train_set)
+preds_rf = predict(fit_rf, newdata = test_set, importance = TRUE)
+confusionMatrix(preds_rf, test_set$music_genre)
+```
+
+```{r}
+# Variable importance table
+variable_importance <- importance(fit_rf) 
+tmp <- tibble(feature = rownames(variable_importance),
+                  Gini = variable_importance[,1]) %>%
+                  arrange(desc(Gini))
+kable(tmp)
+```
+
+```{r}
+# Bar plot of variable importance 
+tmp %>% 
+        ggplot(aes(x=reorder(feature, Gini), y=Gini)) +
+        geom_bar(stat='identity') +
+        coord_flip() + xlab("Feature") +
+        theme(axis.text=element_text(size=8))
+```
+
+#### Selected variables Model Trainig
+
+Based on the above feature importance (Gini > 100). We choose `popularity`, `speechiness`, `instrumentalness`, `acousticness`, `loudness`, `danceability` ,`energy`, `duration_ms` as our predictors.
+
+```{r}
+set.seed(1)
+# selected features
+
+fit_rf = randomForest(music_genre ~ popularity + speechiness + instrumentalness + acousticness + loudness + danceability + energy + duration_ms, data = train_set)
+preds_rf = predict(fit_rf, newdata = test_set, importance = TRUE)
+confusionMatrix(preds_rf, test_set$music_genre)
+```
+
+The performance is not that bad compared with model using all variables. 
