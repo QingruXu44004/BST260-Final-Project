@@ -1,0 +1,101 @@
+---
+title: "ML_PartIII_Regression"
+author: "Julia Snyder"
+date: "12/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Machine Learning 
+
+#### 1. Popularity as outcome (Regression), variable selection, visualization
+
+```{r}
+library(tidyverse)
+library(splitstackshape)
+library(caret)
+library(e1071)
+library(MASS)
+library(pROC)
+library(rpart)
+library(randomForest)
+library(knitr)
+```
+
+```{r}
+data_clean <- readRDS("music_genre_clean.rds")
+```
+
+```{r}
+#popularity as outcome (Regression)
+head(data_clean)
+summary(data_clean$popularity)
+
+```
+
+Potential predictors based on EDA: music genre, danceability, loudness, speechiness
+
+##### Create training and test sets
+```{r}
+set.seed(1)
+
+pop_train_index = createDataPartition(y = data_clean$popularity, times = 1, p = 0.7, list = FALSE)
+pop_train_set = slice(data_clean, pop_train_index)
+pop_test_set = slice(data_clean, -pop_train_index)
+
+dim(pop_train_set)
+dim(pop_test_set)
+```
+
+##### kNN Model
+```{r}
+# Fit a k-nearest neighbors model
+set.seed(1)
+
+knn_fit_pop <- knn3(popularity ~ music_genre + danceability + loudness + speechiness, data=pop_train_set, k=7)
+
+# Prediction for the test set 
+f_hat_pop <- predict(knn_fit_pop, newdata = pop_test_set)[,2]
+
+# Performance metrics
+f_tab_pop <- table(pred=round(f_hat_pop), truth=pop_test_set$popularity)
+#confusionMatrix(f_tab_pop)
+```
+
+##### Decision Tree Model
+```{r}
+# Fit a decision tree model 
+set.seed(1)
+rpart_fit_pop <- rpart(popularity ~ ., data=pop_train_set)
+
+# Prediction for the test set 
+pred_rpart_pop <- predict(rpart_fit_pop, newdata = pop_test_set)
+
+# Performance metrics
+plotcp(rpart_fit_pop)
+rpart_fit_pop
+summary(rpart_fit_pop)
+mean((pred_rpart_pop - pop_test_set$popularity)^2)
+
+# Prune ?
+p <- prune(rpart_fit_pop, cp = 0.025) 
+preds_prune <- predict(p, newdata = pop_test_set)
+mean((preds_prune - pop_test_set$popularity)^2)
+```
+
+##### Random Forest Model
+```{r}
+# Fit a random forest model 
+set.seed(1)
+rf_fit_pop <- randomForest(popularity ~ loudness + speechiness + music_genre, data=pop_train_set, mtry=2)
+
+# Prediction for the test set 
+pred_rf_pop <- predict(rf_fit_pop, newdata = pop_test_set)
+
+# Performance metrics
+rf_fit_pop
+summary(rf_fit_pop)
+mean((pred_rf_pop - pop_test_set$popularity)^2)
+```
