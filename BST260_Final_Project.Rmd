@@ -501,6 +501,23 @@ tmp %>% filter(Gini > 200) %>%
         theme(axis.text=element_text(size=8))
 ```
 
+Speechiness, acousticness, and danceability have Gini indeces above 2000 and show relatively higher variable importances than the other three variables. So random forest with only these three vairbles is fitted below to see if there is any improvement in performance: 
+
+```{r}
+# Fit a random forest model 
+set.seed(1)
+rf_fit2 <- randomForest(mode ~ acousticness + danceability + speechiness, data=train_set)
+# Prediction for the test set 
+p_hat_rf2 <- predict(rf_fit2, newdata = test_set, type = "prob")[,2]
+# Convert the probabilities to predicted response labels 
+y_hat_rf2 <- ifelse(p_hat_rf2 > 0.5, 1, 0)
+# Confusion matrix
+cm_rf2 <- confusionMatrix(data = as.factor(y_hat_rf2), reference = as.factor(test_set$mode))
+cm_rf2
+```
+
+Since the overall accuracy dropped from 0.717 to 0.646, we will still stick with the models with all 6 variables. 
+
 ##### Model comparison
 
 ###### Overall accuracy, specificity, and sensitivity
@@ -559,3 +576,4 @@ auc(roc_rpart)
 auc(roc_rf)
 ```
 
+Among the 7 machine learning models, random forest has the highest overall accuracy (0.717) and AUC value (0.7496) ; and largest area under the ROC curve can be observed under the random forest model. Hence, the random forest model will be chosen as the best model to predict the mode of a song. 
