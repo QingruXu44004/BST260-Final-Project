@@ -1,0 +1,139 @@
+---
+title: 'ML Part IV: Binary Classification of Popularity'
+author: "Jordan Roberts"
+date: "12/7/2021"
+output: html_document
+---
+
+
+
+```{r}
+```
+
+
+### Machine Learning IV (Binary Classification)
+#### Mode (binary variable) as outcome
+
+```{r}
+library(splitstackshape)
+library(caret)
+library(e1071)
+library(MASS)
+library(pROC)
+library(rpart)
+library(randomForest)
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+```
+
+```{r}
+data<- readRDS("music_genre_clean.rds")
+```
+
+##### Exploratory analysis (EDA)
+
+```{r}
+# Distribution of popularity
+hist(data$popularity)
+mean(data$popularity)
+median(data$popularity)
+
+# creation of high and low popularity categories
+data$pop <- ifelse(data$popularity>45,1,0)
+hist(data$pop)
+```
+
+```{r}
+# Contingency table for popularity and music genre
+tab1 <- xtabs(~ pop + music_genre, data = data)
+tab1
+```
+
+```{r}
+# Box plots for continuous predictors
+par(mfrow=c(2,3))
+boxplot(acousticness ~ pop, data = data)
+boxplot(danceability ~ pop, data = data)
+boxplot(duration_ms ~ pop, data = data)
+boxplot(energy ~ pop, data = data)
+boxplot(instrumentalness ~ pop, data = data)
+boxplot(liveness ~ pop, data = data)
+boxplot(loudness ~ pop, data = data)
+boxplot(speechiness ~ mode, data = data)
+boxplot(tempo ~ mode, data = data)
+boxplot(valence ~ mode, data = data)
+```
+
+
+
+According to EDA, four continuous variables (acousticness, danceability, energy, loudness) visually display different distributions at two levels of popularity; music genre also appears different based on the crosstabs. Therefore, these five variables will be selected as the predictors for the following binary classification. 
+
+##### Prepare the data for binary classification
+
+```{r}
+# Create training and test sets
+set.seed(1)
+
+x <- stratified(data, "pop", 0.7, keep.rownames = TRUE)
+train_set <- x %>% dplyr::select(-rn)
+train_index <- as.numeric(x$rn)
+test_set <- data[-train_index,]
+
+dim(train_set)
+dim(test_set)
+```
+
+##### Logistic regression
+
+```{r}
+# Fit a logistic regression model
+glm_fit <- glm(pop ~ acousticness + danceability + energy + loudness + music_genre, data= train_set, family = "binomial")
+# Prediction for the test set 
+p_hat_logit <- predict(glm_fit, newdata = test_set, type="response")
+# Convert the probabilities to predicted response labels 
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 1, 0)
+cm_logit <- confusionMatrix(data = as.factor(y_hat_logit), reference = as.factor(test_set$pop))
+cm_logit
+```
+
+This model shows 86% accuracy, with 94% sensitivity, for identifying popularity in the top half of all songs using genre, acousticness, danceability, energy and loudness. 
+
+##Logistic reduced
+```{r}
+# Fit a logistic regression model
+glm_fit_gen <- glm(pop ~ music_genre, data= train_set, family = "binomial")
+# Prediction for the test set 
+p_hat_logit_gen <- predict(glm_fit_gen, newdata = test_set, type="response")
+# Convert the probabilities to predicted response labels 
+y_hat_logit_gen <- ifelse(p_hat_logit_gen > 0.5, 1, 0)
+cm_logit <- confusionMatrix(data = as.factor(y_hat_logit_gen), reference = as.factor(test_set$pop))
+cm_logit
+```
+Interestingly, however, we do about as well in prediction by looking only at music genre, and no song attributes! 
+
+###### ROC curves
+
+```{r}
+## Logistic regression
+roc_glm <- roc(as.factor(test_set$mode),p_hat_logit)
+
+## Logistic regression genre only
+roc_glm_gen <- roc(as.factor(test_set$mode),p_hat_logit_gen)
+
+# Graph with 2 ROC curves for each model
+ggroc(list("Logistic regression- Music Features" = roc_glm, "Logistic regression- Genre Only" = roc_glm_gen)) +
+  theme(legend.title = element_blank()) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), color = "black", linetype = "dashed") +
+  xlab("Sensitivity") +
+  ylab("Specificity") 
+```
+
+###### AUC values
+
+```{r}
+auc(roc_glm)
+auc(roc_glm_gen)
+```
+
