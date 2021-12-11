@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 ## Machine Learning 
 
-#### 1. Popularity as outcome (Regression), variable selection, visualization
+#### 1. Regression Models to Predict Song Popularity
 
 ```{r}
 library(tidyverse)
@@ -18,7 +18,6 @@ library(splitstackshape)
 library(caret)
 library(e1071)
 library(MASS)
-library(pROC)
 library(rpart)
 library(randomForest)
 library(knitr)
@@ -28,14 +27,17 @@ library(knitr)
 data_clean <- readRDS("music_genre_clean.rds")
 ```
 
+##### Popularity
+
+Popularity is a continuous score ranging from 0-99 that reflects a song's popularity. 
+
 ```{r}
-#popularity as outcome (Regression)
+# Popularity as continuous outcome (Regression)
 head(data_clean)
 summary(data_clean$popularity)
-
 ```
 
-Potential predictors based on EDA: music genre, danceability, loudness, speechiness
+The Exploratory Data Analysis (EDA) included plots of the distribution of continuous and categorical variables and popularity.  Potential predictors based on EDA: music genre, danceability, loudness, speechiness
 
 ##### Create training and test sets
 ```{r}
@@ -53,16 +55,21 @@ dim(pop_test_set)
 ```{r}
 # Fit a k-nearest neighbors model
 set.seed(1)
-
-knn_fit_pop <- knn3(popularity ~ music_genre + danceability + loudness + speechiness, data=pop_train_set, k=7)
+knn_fit_pop <- knn3(popularity ~ ., data=pop_train_set, k=7)
 
 # Prediction for the test set 
-f_hat_pop <- predict(knn_fit_pop, newdata = pop_test_set)[,2]
+preds_pop <- predict(knn_fit_pop, newdata = pop_test_set)[,2]
 
 # Performance metrics
-f_tab_pop <- table(pred=round(f_hat_pop), truth=pop_test_set$popularity)
-#confusionMatrix(f_tab_pop)
+knn_fit_pop
+summary(knn_fit_pop)
+mse_knn <- mean((preds_pop - pop_test_set$popularity)^2)
+mse_knn
+rmse_knn <- RMSE(preds_pop, pop_test_set$popularity)
+rmse_knn
 ```
+
+The square root of the MSE is 46.99, indicating this model leads to test predictions that are within approximately 46.99 points of the true popularity score.  This model has a lot of error in predicting song popularity.
 
 ##### Decision Tree Model
 ```{r}
@@ -70,32 +77,84 @@ f_tab_pop <- table(pred=round(f_hat_pop), truth=pop_test_set$popularity)
 set.seed(1)
 rpart_fit_pop <- rpart(popularity ~ ., data=pop_train_set)
 
-# Prediction for the test set 
+
+# Use tree for prediction
 pred_rpart_pop <- predict(rpart_fit_pop, newdata = pop_test_set)
+test_rpart <- pop_test_set$popularity
 
 # Performance metrics
-plotcp(rpart_fit_pop)
 rpart_fit_pop
 summary(rpart_fit_pop)
-mean((pred_rpart_pop - pop_test_set$popularity)^2)
+rpart.plot::rpart.plot(rpart_fit_pop)
+plot(pred_rpart_pop, test_rpart)
+mse_rpart <- mean((pred_rpart_pop - pop_test_set$popularity)^2)
+mse_rpart
+rmse_rpart <- RMSE(pred_rpart_pop, pop_test_set$popularity)
+rmse_rpart
 
-# Prune ?
+# Trying pruning tree
+plotcp(rpart_fit_pop)
 p <- prune(rpart_fit_pop, cp = 0.025) 
 preds_prune <- predict(p, newdata = pop_test_set)
 mean((preds_prune - pop_test_set$popularity)^2)
 ```
 
+Music genre was the predictor that minimized the error the most. The test set MSE for this tree is 96.04.  The square root of the MSE is 9.8, indicating this model leads to test predictions that are within approximately 9.8 points of the true popularity score. Pruning did not improve the MSE.
+
 ##### Random Forest Model
+
 ```{r}
 # Fit a random forest model 
 set.seed(1)
-rf_fit_pop <- randomForest(popularity ~ loudness + speechiness + music_genre, data=pop_train_set, mtry=2)
+rf_fit_pop <- randomForest(popularity ~ ., data=pop_train_set, ntree=100, mtry=3, importance = TRUE)
 
 # Prediction for the test set 
 pred_rf_pop <- predict(rf_fit_pop, newdata = pop_test_set)
+test_rf <- pop_test_set$popularity
 
 # Performance metrics
 rf_fit_pop
 summary(rf_fit_pop)
-mean((pred_rf_pop - pop_test_set$popularity)^2)
+plot(pred_rf_pop, test_rf)
+mse_rf <- mean((pred_rf_pop - pop_test_set$popularity)^2)
+mse_rf
+rmse_rf <- RMSE(pred_rf_pop, pop_test_set$popularity)
+rmse_rf
+
+#Variable Importance
+variable_importance <- importance(rf_fit_pop)
+tmp <- tibble(feature = rownames(variable_importance), Gini = variable_importance[,1])
+tmp
+
 ```
+I used a small number of trees and low mtry to decrease the computing power needed.  The test set MSE for this tree is 83.24.  The square root of the MSE is 9.12, indicating this model leads to test predictions that are within approximately 9.12 points of the true popularity score.
+
+##### Selected Features Random Forest Model
+```{r}
+# Fit a random forest model 
+set.seed(1)
+rf_fit_pop2 <- randomForest(popularity ~ music_genre + instrumentalness + valence + energy + loudness + liveness + duration_ms + danceability, data=pop_train_set, ntree=100, mtry=3, importance = TRUE)
+
+
+# Prediction for the test set 
+pred_rf_pop2 <- predict(rf_fit_pop2, newdata = pop_test_set)
+test_rf2 <- pop_test_set$popularity
+
+# Performance metrics
+rf_fit_pop2
+summary(rf_fit_pop2)
+plot(pred_rf_pop2, test_rf2)
+mse_rf <- mean((pred_rf_pop2 - pop_test_set$popularity)^2)
+mse_rf
+rmse_rf2 <- RMSE(pred_rf_pop2, pop_test_set$popularity)
+rmse_rf
+```
+This model performs the same as the random forest model with all predictors.
+
+##### Model Comparisons
+```{r}
+rmse_results <- data.frame(Model = c("kNN", "Decision Tree", "Random Forest"), RMSE = c(rmse_knn, rmse_rpart, rmse_rf)) 
+rmse_results  
+```
+
+The random forest model performed the best.
