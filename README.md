@@ -11,7 +11,8 @@ While music preferences may be perceived as highly personal and emotional, predi
 #### Related Work: Anything that inspired you, such as a paper, a web site, or something we discussed in class.
 
 #### Initial Questions: 
-What questions are you trying to answer? How did these questions evolve over the course of the project? What new questions did you consider in the course of your analysis?
+
+What features make a song popular? As we learned about machine learning methods, we though we can make predictions about songs that could be popular in the future, and recommend tracks for any users. During our analysis, we also want to investigate if musical modes (major or minor) can be predicted from the features. 
 
 #### Data:
 The dataset was obtained from the Kaggle website (https://www.kaggle.com/vicsuperman/prediction-of-music-genre) and was originally collected from Spotify. The csv file was downloaded directly from the website.
@@ -30,4 +31,4 @@ ML_PartIII_Regression.Rmd
 
 ML_PartIV_Classification.Rmd
 
-Shiny app
+Shiny_app_analysis.Rmd
