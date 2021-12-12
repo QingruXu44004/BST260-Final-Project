@@ -5,11 +5,9 @@ date: "12/7/2021"
 output: html_document
 ---
 
-
-
-```{r}
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
-
 
 ### Machine Learning IV (Binary Classification)
 #### Mode (binary variable) as outcome
@@ -117,10 +115,10 @@ Interestingly, however, we do about as well in prediction by looking only at mus
 
 ```{r}
 ## Logistic regression
-roc_glm <- roc(as.factor(test_set$mode),p_hat_logit)
+roc_glm <- roc(as.factor(test_set$pop),p_hat_logit)
 
 ## Logistic regression genre only
-roc_glm_gen <- roc(as.factor(test_set$mode),p_hat_logit_gen)
+roc_glm_gen <- roc(as.factor(test_set$pop),p_hat_logit_gen)
 
 # Graph with 2 ROC curves for each model
 ggroc(list("Logistic regression- Music Features" = roc_glm, "Logistic regression- Genre Only" = roc_glm_gen)) +
