@@ -62,7 +62,7 @@ confusionMatrix(preds_rf, test_set$music_genre)
 
 #### Treat outcome variable (Music Genre)
 
-From the confusion matrix, we see that it seems that most difficulty is to distinguish between `Hip-Hop` and `Rap`. So we would combine these two music genre into `Hip-Hop/Rap`. `Alternative`, `Blues`, `Jazz` seem to be difficult to classified. So we simply remove those music genres.  Also, the results show that `Classical` and `Rock` received the better performance.
+From the confusion matrix, we see that it seems that the most difficult is to distinguish between `Hip-Hop` and `Rap`. So we would combine these two music genres into `Hip-Hop/Rap`. `Alternative`, `Blues`, `Jazz` seem to be difficult to classify. So we simply remove those music genres.  Also, the results show that `Classical` and `Rock` received the better performance.
 
 ```{r}
 set.seed(1)
