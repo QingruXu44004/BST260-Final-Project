@@ -10,7 +10,7 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ### Machine Learning IV (Binary Classification)
-#### Mode (binary variable) as outcome
+#### Popularity (Binary Variable) as outcome
 
 ```{r}
 library(splitstackshape)
